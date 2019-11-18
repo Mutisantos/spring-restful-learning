@@ -5,17 +5,20 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +34,14 @@ public class UserResourceController {
    // Autowiring a Spring-managed component injects the dependency from the component to this class.
    @Autowired
    private UserDAOService userDAOService;
+
+   @Autowired
+   private MessageSource messageSource;
+
+   @RequestMapping(method = RequestMethod.GET, path = "/main-internationalized")
+   public String showMainContent(@RequestHeader(name = "Accept-Language", required = false) final Locale locale) {
+      return messageSource.getMessage("good.morning.message", null, locale);
+   }
 
    @RequestMapping(method = RequestMethod.GET, path = "/users")
    public List<User> retriveAllUsers() {
