@@ -1,10 +1,18 @@
 package com.kanionland.rest.webservices.restfulwebservices.controllers;
 
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
+
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,7 +38,7 @@ public class UserResourceController {
    }
 
    @RequestMapping(method = RequestMethod.GET, path = "/users/{uid}")
-   public User retriveUser(@PathVariable final int uid) throws UserNotFoundException {
+   public EntityModel<User> retriveUser(@PathVariable final int uid) throws UserNotFoundException {
       final User foundUser = userDAOService.findOne(uid);
       if (Objects.isNull(foundUser)) {
          // Throwing a unhandled exception upwards will end-up throwing Server Error, which it's not completely true
@@ -38,12 +46,24 @@ public class UserResourceController {
          // Unless the exception has a certain ResponseStatus annotation
          throw new UserNotFoundException("User not found for ID-" + uid);
       }
-      return foundUser;
+      // Using a HATEOAS Resource, the return will handle both the Object and links related to the response if needed
+      final EntityModel<User> resource = new EntityModel<>(foundUser);
+      final WebMvcLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retriveAllUsers());
+      resource.add(linkTo.withRel("all-users"));
+      return resource;
+   }
+
+   @RequestMapping(method = RequestMethod.DELETE, path = "/users/{uid}")
+   public ResponseEntity<Object> deleteUser(@PathVariable final int uid) throws UserNotFoundException {
+      if (!userDAOService.removeUser(uid)) {
+         throw new UserNotFoundException("User not found for ID-" + uid);
+      }
+      return ResponseEntity.status(HttpStatus.OK).build();
    }
 
    @RequestMapping(method = RequestMethod.POST, path = "/users")
    // Whatever is being passed in the Body of the Request, will be mapped into this parameter and object type
-   public ResponseEntity<Object> createUser(@RequestBody final User user) {
+   public ResponseEntity<Object> createUser(@Valid @RequestBody final User user) {
       final User createdUser = userDAOService.save(user);
       // Get the current URI of the request and build it with extra fields using the Path Method
       final URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")

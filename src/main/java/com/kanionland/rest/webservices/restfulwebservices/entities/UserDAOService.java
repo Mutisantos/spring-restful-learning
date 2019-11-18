@@ -3,6 +3,7 @@ package com.kanionland.rest.webservices.restfulwebservices.entities;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,16 @@ public class UserDAOService {
 
    public User findOne(final int id) {
       return users.stream().filter(user -> id == user.getUid()).findFirst().orElse(null);
+   }
+
+   public boolean removeUser(final int id) {
+      final Predicate<User> requiredUser = user -> user.getUid() == id;
+      if (users.removeIf(requiredUser)) {
+         usersCount = users.size();
+         return true;
+      } else {
+         return false;
+      }
    }
 
 }
