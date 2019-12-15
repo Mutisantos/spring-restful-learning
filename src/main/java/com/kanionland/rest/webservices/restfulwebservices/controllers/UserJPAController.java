@@ -11,28 +11,34 @@ import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.hateoas.Resource;
 import org.springframework.hateoas.mvc.ControllerLinkBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import com.kanionland.rest.webservices.restfulwebservices.entities.Post;
 import com.kanionland.rest.webservices.restfulwebservices.entities.User;
-import com.kanionland.rest.webservices.restfulwebservices.entities.UserDAOService;
 import com.kanionland.rest.webservices.restfulwebservices.exceptions.UserNotFoundException;
+import com.kanionland.rest.webservices.restfulwebservices.repositories.PostsRepository;
+import com.kanionland.rest.webservices.restfulwebservices.repositories.UserRepository;
 
 @RestController
-public class UserResourceController {
+public class UserJPAController {
 
    // Autowiring a Spring-managed component injects the dependency from the component to this class.
    @Autowired
-   private UserDAOService userDAOService;
+   private UserRepository userRepository;
+
+   @Autowired
+   private PostsRepository postRepository;
 
    @Autowired
    private MessageSource messageSource;
@@ -42,14 +48,10 @@ public class UserResourceController {
    // return messageSource.getMessage("good.morning.message", null, locale);
    // }
 
-   @RequestMapping(method = RequestMethod.GET, path = "/main-internationalized")
-   public String showMainContent() {
-      return messageSource.getMessage("good.morning.message", null, LocaleContextHolder.getLocale());
-   }
 
-   @RequestMapping(method = RequestMethod.GET, path = "/users")
+   @RequestMapping(method = RequestMethod.GET, path = "/jpa/users")
    public List<User> retriveAllUsers() {
-      return userDAOService.findAll();
+      return userRepository.findAll();
    }
 
    // Using HATEOAS Sprint 2.2.x+
@@ -70,9 +72,9 @@ public class UserResourceController {
    // }
 
    // Using HATEOAS Sprint 2.1.x+
-   @RequestMapping(method = RequestMethod.GET, path = "/users/{uid}")
+   @RequestMapping(method = RequestMethod.GET, path = "/jpa/users/{uid}")
    public Resource<User> retriveUser(@PathVariable final int uid) throws UserNotFoundException {
-      final User foundUser = userDAOService.findOne(uid);
+      final User foundUser = userRepository.findById(uid).orElse(null);
       if (Objects.isNull(foundUser)) {
          // Throwing a unhandled exception upwards will end-up throwing Server Error, which it's not completely true
          // throw new Exception("");
@@ -85,21 +87,48 @@ public class UserResourceController {
       return resource;
    }
 
-   @RequestMapping(method = RequestMethod.DELETE, path = "/users/{uid}")
+   @RequestMapping(method = RequestMethod.DELETE, path = "/jpa/users/{uid}")
    public ResponseEntity<Object> deleteUser(@PathVariable final int uid) throws UserNotFoundException {
-      if (!userDAOService.removeUser(uid)) {
+      final User foundUser = userRepository.findById(uid).orElse(null);
+      if (Objects.isNull(foundUser)) {
          throw new UserNotFoundException("User not found for ID-" + uid);
       }
+      userRepository.deleteById(uid);
       return ResponseEntity.status(HttpStatus.OK).build();
    }
 
-   @RequestMapping(method = RequestMethod.POST, path = "/users")
+   @RequestMapping(method = RequestMethod.POST, path = "/jpa/users")
    // Whatever is being passed in the Body of the Request, will be mapped into this parameter and object type
    public ResponseEntity<Object> createUser(@Valid @RequestBody final User user) {
-      final User createdUser = userDAOService.save(user);
+      final User createdUser = userRepository.save(user);
       // Get the current URI of the request and build it with extra fields using the Path Method
       final URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
             .buildAndExpand(createdUser.getUid()).toUri();
+      // Give a response with the expected URI for the newly created resource
+      return ResponseEntity.created(location).build();
+   }
+
+   // The Get/Post/Put/Delete mapping specifies the HTTP request supported by the endpoint
+   @GetMapping(path = "/jpa/users/{uid}/posts")
+   public List<Post> retriveUserPosts(@PathVariable final int uid) throws UserNotFoundException {
+      final User foundUser = userRepository.findById(uid).orElse(null);
+      if (Objects.isNull(foundUser)) {
+         throw new UserNotFoundException("User not found for ID-" + uid);
+      }
+      return foundUser.getUserPosts();
+   }
+
+   @PostMapping(path = "/jpa/users/{uid}/posts")
+   public ResponseEntity<Post> crateUserPosts(@PathVariable final int uid, @Valid @RequestBody Post post)
+         throws UserNotFoundException {
+      final User foundUser = userRepository.findById(uid).orElse(null);
+      if (Objects.isNull(foundUser)) {
+         throw new UserNotFoundException("User not found for ID-" + uid);
+      }
+      post.setUserCreator(foundUser);
+      postRepository.save(post);
+      final URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(post.getId())
+            .toUri();
       // Give a response with the expected URI for the newly created resource
       return ResponseEntity.created(location).build();
    }
